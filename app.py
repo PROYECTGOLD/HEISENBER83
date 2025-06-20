@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from moviepy.editor import ImageClip, concatenate_videoclips, AudioFileClip
+from moviepy.editor import ImageClip, concatenate_videoclips
 import os
 import tempfile
 from google.oauth2 import service_account
@@ -17,8 +17,7 @@ def subir_a_drive(ruta_video, nombre_video):
     file_metadata = {"name": nombre_video, "parents": [FOLDER_ID]}
     media = MediaFileUpload(ruta_video, mimetype="video/mp4")
     archivo = service.files().create(body=file_metadata, media_body=media, fields="id").execute()
-    video_id = archivo.get("id")
-    return f"https://drive.google.com/file/d/{video_id}/view"
+    return f"https://drive.google.com/file/d/{archivo['id']}/view"
 
 @app.route("/generar_video", methods=["POST"])
 def generar_video():
@@ -26,24 +25,27 @@ def generar_video():
     idea = data.get("idea")
     imagenes = data.get("imagenes", [])
 
-    if not idea or not imagenes:
+    if not idea or not imagenes or not imagenes[0]:
         return jsonify({"error": "Faltan datos"}), 400
 
     try:
-        clips = []
-        for url in imagenes[:1]:  # Solo 1 imagen
-            clip = ImageClip(url).set_duration(12).resize(height=1920).set_position("center")
-            clips.append(clip)
+        clip = ImageClip(imagenes[0]).set_duration(12).resize(height=1920).set_position("center")
+        video = concatenate_videoclips([clip], method="compose")
 
-        video = concatenate_videoclips(clips, method="compose")
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as f:
             ruta_video = f.name
-            video.write_videofile(ruta_video, fps=24, codec="libx264")
+            video.write_videofile(ruta_video, fps=24, codec="libx264", audio=False)
 
         nombre_video = f"{idea[:50].replace(' ', '_')}.mp4"
         video_url = subir_a_drive(ruta_video, nombre_video)
         os.remove(ruta_video)
+
         return jsonify({"video_url": video_url})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
