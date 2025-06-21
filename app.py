@@ -35,6 +35,7 @@ def generar_video():
 
         # Crear clip de 12s con la imagen redimensionada (vertical 1080x1920 o 720x1280)
         clip = ImageClip(imagen).set_duration(12).resize(height=1920).set_position("center")
+
         video = concatenate_videoclips([clip], method="compose")
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as f:
@@ -45,8 +46,8 @@ def generar_video():
         video_url = subir_a_drive(ruta_video, nombre_video)
 
         os.remove(ruta_video)
-        return jsonify({"video_url": video_url})
 
+        return jsonify({"video_url": video_url})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
