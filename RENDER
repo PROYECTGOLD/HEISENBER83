@@ -1,1 +1,21 @@
+services:
+  - type: web
+    name: heisenberg-service
+    env: docker
+    dockerfilePath: Dockerfile
+    branch: main
+    autoDeploy: true
+    plan: free
+    region: oregon
+    envVars:
+      - key: PORT
+        value: "10000"
+    mounts:
+      - type: secret
+        source: heisenberg-credentials
+        target: /etc/secrets/heisenberg-credentials.json
+    healthCheckPath: /health
+    healthCheckIntervalSeconds: 10
+    healthCheckTimeoutSeconds: 2
+    healthCheckRetries: 3
 
