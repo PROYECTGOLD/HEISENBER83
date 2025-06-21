@@ -10,6 +10,7 @@ app = Flask(__name__)
 
 # Ruta al archivo de credenciales en Render
 CREDENTIALS_PATH = "/etc/secrets/heisenberg-credentials.json"
+
 # ID de carpeta de destino en tu Google Drive
 FOLDER_ID = "1952GPiJ002KyA8hYkEnt7nvSSGAHweoN"
 
@@ -32,7 +33,7 @@ def generar_video():
         if not idea or not imagen:
             return jsonify({"error": "Faltan datos: 'idea' o 'imagenes'"}), 400
 
-        # Crear clip de 12s
+        # Crear clip de 12s con la imagen redimensionada (vertical 1080x1920 o 720x1280)
         clip = ImageClip(imagen).set_duration(12).resize(height=1920).set_position("center")
         video = concatenate_videoclips([clip], method="compose")
 
@@ -51,4 +52,3 @@ def generar_video():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
-
