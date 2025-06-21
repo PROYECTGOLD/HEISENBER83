@@ -1,73 +1,44 @@
 from flask import Flask, request, jsonify
-from moviepy.editor import ImageClip, concatenate_videoclips
-import os
-import tempfile
-import requests
+from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+import os
 
 app = Flask(__name__)
 
-# Ruta al archivo de credenciales en Render
-CREDENTIALS_PATH = "/etc/secrets/heisenberg-credentials.json"
-# ID de carpeta de destino en tu Google Drive
-FOLDER_ID = "1952GPiJ002KyA8hYkEnt7nvSSGAHweoN"
+# Carga de credenciales de Google
+SERVICE_ACCOUNT_FILE = 'client_secrets.json'
+SCOPES = ['https://www.googleapis.com/auth/drive.file']
+credentials = service_account.Credentials.from_service_account_file(
+    SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+drive_service = build('drive', 'v3', credentials=credentials)
 
-def descargar_imagen(url):
-    response = requests.get(url)
-    if response.status_code == 200:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as f:
-            f.write(response.content)
-            return f.name
-    else:
-        raise Exception(f"Error al descargar imagen: {response.status_code}")
-
-def subir_a_drive(ruta_video, nombre_video):
-    creds = service_account.Credentials.from_service_account_file(CREDENTIALS_PATH)
-    service = build("drive", "v3", credentials=creds)
-    file_metadata = {"name": nombre_video, "parents": [FOLDER_ID]}
-    media = MediaFileUpload(ruta_video, mimetype="video/mp4")
-    archivo = service.files().create(body=file_metadata, media_body=media, fields="id").execute()
-    video_id = archivo.get("id")
-    return f"https://drive.google.com/file/d/{video_id}/view"
-
-@app.route("/generar_video", methods=["POST"])
-def generar_video():
+@app.route("/generate", methods=["POST"])
+def generate_video():
     try:
-        data = request.get_json()
-        idea = data.get("idea")
-        imagen_url = data.get("imagenes", [])[0]  # Solo la primera imagen
+        data = request.json
+        image_path = data["image_path"]
+        audio_path = data["audio_path"]
+        duration = data.get("duration", 5)
+        output_path = "output_video.mp4"
 
-        if not idea or not imagen_url:
-            return jsonify({"error": "Faltan datos: 'idea' o 'imagenes'"}), 400
+        clip = ImageClip(image_path, duration=duration).set_audio(AudioFileClip(audio_path))
+        clip = clip.set_duration(duration)
+        clip.write_videofile(output_path, fps=24)
 
-        # Descargar imagen desde URL
-        imagen_local = descargar_imagen(imagen_url)
+        # Subir a Google Drive
+        file_metadata = {"name": output_path}
+        media = MediaFileUpload(output_path, mimetype="video/mp4")
+        file = drive_service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
-        # Crear clip de 12s con la imagen redimensionada (vertical 1080x1920)
-        clip = ImageClip(imagen_local).set_duration(12).resize(height=1920).set_position("center")
-        video = concatenate_videoclips([clip], method="compose")
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as f:
-            ruta_video = f.name
-            video.write_videofile(ruta_video, fps=24, codec="libx264")
-
-        nombre_video = f"{idea[:50].replace(' ', '_')}.mp4"
-        video_url = subir_a_drive(ruta_video, nombre_video)
-
-        # Limpiar archivos temporales
-        os.remove(ruta_video)
-        os.remove(imagen_local)
-
-        return jsonify({"video_url": video_url})
-
+        return jsonify({"status": "success", "video_id": file.get("id")})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route("/health")
-def health():
-    return "OK", 200
+@app.route("/", methods=["GET"])
+def home():
+    return "Flask Render Video Service is running!"
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    app.run(host="0.0.0.0", port=5000)
