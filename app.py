@@ -9,9 +9,7 @@ from googleapiclient.http import MediaFileUpload
 
 app = Flask(__name__)
 
-# Ruta al archivo de credenciales en Render
 CREDENTIALS_PATH = "/etc/secrets/heisenberg-credentials.json"
-# ID de carpeta de destino en tu Google Drive
 FOLDER_ID = "1952GPiJ002KyA8hYkEnt7nvSSGAHweoN"
 
 def descargar_imagen(url):
@@ -37,15 +35,12 @@ def generar_video():
     try:
         data = request.get_json()
         idea = data.get("idea")
-        imagen_url = data.get("imagenes", [])[0]  # Solo la primera imagen
+        imagen_url = data.get("imagenes", [])[0]
 
         if not idea or not imagen_url:
             return jsonify({"error": "Faltan datos: 'idea' o 'imagenes'"}), 400
 
-        # Descargar imagen desde URL
         imagen_local = descargar_imagen(imagen_url)
-
-        # Crear clip de 12s con la imagen redimensionada (vertical 1080x1920)
         clip = ImageClip(imagen_local).set_duration(12).resize(height=1920).set_position("center")
         video = concatenate_videoclips([clip], method="compose")
 
@@ -56,7 +51,6 @@ def generar_video():
         nombre_video = f"{idea[:50].replace(' ', '_')}.mp4"
         video_url = subir_a_drive(ruta_video, nombre_video)
 
-        # Limpiar archivos temporales
         os.remove(ruta_video)
         os.remove(imagen_local)
 
