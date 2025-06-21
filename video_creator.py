@@ -1,4 +1,4 @@
-from moviepy.editor import *
+from moviepy.editor import ImageClip, concatenate_videoclips, AudioFileClip
 import os
 
 def create_video(image_paths, audio_path, index=0):
